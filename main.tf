@@ -57,6 +57,11 @@ resource "aws_s3_bucket" "log-bucket" {
   bucket = "fpt-codebuild-logs"
 }
 
+# Create S3 artifact for codebuild
+resource "aws_s3_bucket" "artifact-bucket" {
+  bucket = "fpt-codebuild-artifact"
+}
+
 data "aws_iam_policy_document" "codebuild-assume-role" {
   statement {
     effect = "Allow"
@@ -86,6 +91,7 @@ resource "aws_codebuild_project" "fpt-codebuild-java-project" {
 
   artifacts {
     type = "S3"
+    location = "fpt-codebuild-artifact"
   }
 
   cache {
