@@ -79,6 +79,25 @@ data "aws_iam_policy_document" "codebuild-assume-role" {
 resource "aws_iam_role" "codebuild-role" {
   name               = "codebuild-role"
   assume_role_policy = data.aws_iam_policy_document.codebuild-assume-role.json
+
+  #policy to enable codebuild t send artifact to s3 bucket
+  inline_policy {
+    name = "s3-codebuild"
+
+    policy = jsonencode({
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:*",
+                "s3-object-lambda:*"
+            ],
+            "Resource": "*"
+        }
+    ]
+})
+  }
 }
 
 # IAM policy to grant CloudWatch Logs permissions
@@ -106,6 +125,7 @@ resource "aws_codebuild_project" "fpt-codebuild-java-project" {
   artifacts {
     type = "S3"
     location = aws_s3_bucket.artifact-bucket.id
+    bucket_owner_access = "FULL"
   }
 
   cache {
