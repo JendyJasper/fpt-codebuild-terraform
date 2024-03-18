@@ -77,10 +77,24 @@ data "aws_iam_policy_document" "codebuild-assume-role" {
 
 #create for codebuild
 resource "aws_iam_role" "codebuild-role" {
-  name               = "example"
+  name               = "codebuild-role"
   assume_role_policy = data.aws_iam_policy_document.codebuild-assume-role.json
 }
 
+# IAM policy to grant CloudWatch Logs permissions
+data "aws_iam_policy_document" "codebuild-cloudwatch-policy" {
+  statement {
+    effect    = "Allow"
+    actions   = ["logs:CreateLogStream"]
+    resources = ["arn:aws:logs:*:*:log-group:/aws/codebuild/*"]
+  }
+}
+
+# Attach IAM policy to the CodeBuild role
+resource "aws_iam_role_policy_attachment" "codebuild-cloudwatch-attachment" {
+  role       = aws_iam_role.codebuild-role.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchLogsFullAccess" # or specify your custom policy ARN
+}
 
 #create codebuild project
 resource "aws_codebuild_project" "fpt-codebuild-java-project" {
@@ -91,7 +105,7 @@ resource "aws_codebuild_project" "fpt-codebuild-java-project" {
 
   artifacts {
     type = "S3"
-    location = "fpt-codebuild-artifact"
+    location = aws_s3_bucket.artifact-bucket.id
   }
 
   cache {
@@ -142,26 +156,21 @@ data "aws_secretsmanager_secret_version" "github-pat-secret-version" {
   secret_id = data.aws_secretsmanager_secret.github-pat.id
 }
 
-#add github credentials for codbuild
+#add github credentials for codebuild
 resource "aws_codebuild_source_credential" "fpt-codebuild-java" {
   auth_type   = "PERSONAL_ACCESS_TOKEN"
   server_type = "GITHUB"
-  token = data.aws_secretsmanager_secret_version.github-pat-secret-version.secret_string
+  token = jsondecode(data.aws_secretsmanager_secret_version.github-pat-secret-version.secret_string)["personal-access-token_codebuild"]
 }
 
 #add webhook credentials
-resource "aws_codebuild_webhook" "fpt-codbuild-webhook" {
+resource "aws_codebuild_webhook" "fpt-codebuild-webhook" {
   project_name = aws_codebuild_project.fpt-codebuild-java-project.name
   build_type   = "BUILD"
   filter_group {
     filter {
       type    = "EVENT"
       pattern = "PUSH"
-    }
-
-    filter {
-      type    = "BASE_REF"
-      pattern = "main"
     }
   }
 }
